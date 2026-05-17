@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "heraldo"
+version = "0.1.0"
+description = "BLE advertising beacon library for Raspberry Pi using BlueZ/DBus"
+requires-python = ">=3.10"
+# dbus-python and PyGObject require system libraries; on Raspberry Pi install
+# via: sudo apt install python3-dbus python3-gi
+dependencies = [
+    "dbus-python; sys_platform == 'linux'",
+    "PyGObject; sys_platform == 'linux'",
+]
+
+[project.scripts]
+heraldo = "heraldo.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["heraldo"]
