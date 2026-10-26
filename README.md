@@ -53,3 +53,18 @@ Runs until Ctrl+C or SIGTERM, then unregisters cleanly from BlueZ.
 | `--name` | no | — | Bluetooth adapter alias shown to scanners |
 | `--adapter` | no | auto | DBus adapter path (e.g. `/org/bluez/hci1`) |
 | `--ad-type` | no | `peripheral` | `peripheral` or `broadcast` |
+
+## Packaging
+
+`packaging/build.sh` builds a self-contained `heraldo` (PyInstaller bundles the Python runtime and the dbus/GLib bindings) and wraps it in a Debian package:
+
+```bash
+sudo apt install python3-dbus python3-gi python3-pip dpkg-dev
+pip install pyinstaller
+packaging/build.sh
+# dist/heraldo-<version>-linux-<arch>.tar.gz
+# dist/heraldo_<version>_<arch>.deb
+sudo apt install ./dist/heraldo_*.deb
+```
+
+The version comes from the latest `v*` git tag, falling back to `pyproject.toml`. The `.deb` only depends on `bluez`; build it on the architecture you want to install on (e.g. on the Pi for `arm64`/`armhf`).

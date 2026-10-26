@@ -1,0 +1,11 @@
+Package: heraldo
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: Kurt Sell <kurt.sell8@gmail.com>
+Depends: bluez
+Section: net
+Priority: optional
+Homepage: https://github.com/ksell8/heraldo
+Description: BLE beacon advertiser (iBeacon, Eddystone) using BlueZ
+ Self-contained build of heraldo: ships its own Python runtime and
+ dbus/GLib bindings (PyInstaller), so only the BlueZ daemon is needed.
