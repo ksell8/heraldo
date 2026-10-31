@@ -102,11 +102,19 @@ jobs:
       # debsigs embeds the signature as the _gpgorigin member; it signs
       # debian-binary + control.tar.* + data.tar.*, in that order.
       - name: Verify package signature
+        shell: bash
         run: |
           for deb in "$PWD"/dist/*.deb; do
             dir="$(mktemp -d)"
-            (cd "${dir}" && ar x "${deb}" && ar t "${deb}" \
-              && cat debian-binary control.tar.* data.tar.* | gpg --batch --verify _gpgorigin -)
+            cd "${dir}"
+            if ! out="$( { ar t "${deb}" && ar x "${deb}" \
+                && cat debian-binary control.tar.* data.tar.* | gpg --batch --verify _gpgorigin -; } 2>&1 )"; then
+              printf '%s\n' "${out}"
+              printf '%s' "${out}" | python3 -c 'import sys; print("::error title=Signature check failed::" + sys.stdin.read().replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
+              exit 1
+            fi
+            printf '%s\n' "${out}"
+            cd - >/dev/null
           done
 
       - uses: actions/upload-artifact@v4
