@@ -26,6 +26,11 @@ if [ -z "${GPG_KEY}" ] || ! gpg --batch --list-secret-keys "${GPG_KEY}" >/dev/nu
   exit 1
 fi
 
+# debsigs (0.1.26) can't read zstd-compressed members, which Ubuntu's dpkg-deb
+# uses by default: it would sign only debian-binary and the signature would
+# fail to verify. xz is Debian's default and works.
+export DPKG_DEB_COMPRESSOR_TYPE="${DPKG_DEB_COMPRESSOR_TYPE:-xz}"
+
 # The version comes from [project].version in pyproject.toml.
 rm -rf build dist
 ${BRIEFCASE} package linux system --no-input --identity "${GPG_KEY}"
