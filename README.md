@@ -53,3 +53,22 @@ Runs until Ctrl+C or SIGTERM, then unregisters cleanly from BlueZ.
 | `--name` | no | — | Bluetooth adapter alias shown to scanners |
 | `--adapter` | no | auto | DBus adapter path (e.g. `/org/bluez/hci1`) |
 | `--ad-type` | no | `peripheral` | `peripheral` or `broadcast` |
+
+## Packaging
+
+`packaging/build.sh` builds a Debian package with [BeeWare Briefcase](https://briefcase.readthedocs.io/) (`briefcase package linux system`) and signs it with GPG. It needs Python 3.11+ and Briefcase 0.4.7+ (earlier Briefcase versions can't sign Linux packages).
+
+Briefcase installs dbus-python and PyGObject into the package itself, but it builds them from source, so the build machine needs their C headers. Briefcase checks for these packages (`system_requires` in `pyproject.toml`) but doesn't install them:
+
+```bash
+sudo apt install bluez debsigs libcairo2-dev libdbus-1-dev libgirepository1.0-dev libglib2.0-dev pkg-config
+pip install "briefcase>=0.4.7"
+packaging/build.sh
+# dist/heraldo_<version>-1~<distro>-<codename>_<arch>.deb
+```
+
+Machines that install the `.deb` don't need any of that: `sudo apt install ./heraldo_*.deb` pulls in the runtime dependencies (`bluez` and the GLib/D-Bus libraries) itself.
+
+The version comes from `version` in `pyproject.toml`. Build on the distro and architecture you want to install on (e.g. on the Pi for `arm64`/`armhf`).
+
+A GPG secret key is needed to do the build: Briefcase signs the `.deb` with `debsigs` (the signature is embedded in the package) using the first secret key in your keyring, or the one named in `HERALDO_GPG_KEY`. `apt`/`dpkg` don't check this signature by default; check it with `debsig-verify` and a policy for the key.
