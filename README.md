@@ -72,3 +72,12 @@ Machines that install the `.deb` don't need any of that: `sudo apt install ./her
 The version comes from `version` in `pyproject.toml`. Build on the distro and architecture you want to install on (e.g. on the Pi for `arm64`/`armhf`).
 
 A GPG secret key is needed to do the build: Briefcase signs the `.deb` with `debsigs` (the signature is embedded in the package) using the first secret key in your keyring, or the one named in `HERALDO_GPG_KEY`. `apt`/`dpkg` don't check this signature by default; check it with `debsig-verify` and a policy for the key.
+
+## Releases
+
+Pushing a version tag builds the signed `.deb` for x86_64 and aarch64 (arm64) with `packaging/build.sh` and attaches it and `SHA256SUMS` to a GitHub Release. The tag must match `version` in `pyproject.toml`, and the workflow needs the signing key in the `HERALDO_GPG_PRIVATE_KEY` repo secret (optionally its fingerprint in `HERALDO_GPG_KEY`). Pull requests and manual runs without the secret sign with a throwaway key, so only tagged releases need it.
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
