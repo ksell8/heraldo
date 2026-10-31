@@ -47,7 +47,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             bluez gir1.2-glib-2.0 libcairo2 libdbus-1-3 libgirepository-1.0-1 \
             libcairo2-dev libdbus-1-dev libgirepository1.0-dev libglib2.0-dev \
-            pkg-config python3-dev python3-venv dpkg-dev debsigs
+            pkg-config python3-dev python3-venv dpkg-dev debsigs debsig-verify
 
       - name: Install Briefcase
         run: |
@@ -99,22 +99,37 @@ jobs:
           path: logs/
           if-no-files-found: ignore
 
-      # debsigs embeds the signature as the _gpgorigin member; it signs
-      # debian-binary + control.tar.* + data.tar.*, in that order.
+      # Check the embedded debsigs signature the way an installing machine
+      # would: debsig-verify with a policy and keyring for the signing key.
       - name: Verify package signature
         shell: bash
+        env:
+          HERALDO_GPG_KEY: ${{ secrets.HERALDO_GPG_KEY }}
         run: |
-          for deb in "$PWD"/dist/*.deb; do
-            dir="$(mktemp -d)"
-            cd "${dir}"
-            if ! out="$( { ar t "${deb}" && ar x "${deb}" \
-                && cat debian-binary control.tar.* data.tar.* | gpg --batch --verify _gpgorigin -; } 2>&1 )"; then
+          fpr="$(gpg --batch --with-colons --list-secret-keys ${HERALDO_GPG_KEY:+"${HERALDO_GPG_KEY}"} | awk -F: '$1 == "fpr" { print $10; exit }')"
+          keyid="${fpr: -16}"
+          sudo mkdir -p "/etc/debsig/policies/${keyid}" "/usr/share/debsig/keyrings/${keyid}"
+          gpg --batch --export "${fpr}" | sudo tee "/usr/share/debsig/keyrings/${keyid}/debsig.gpg" >/dev/null
+          sudo tee "/etc/debsig/policies/${keyid}/heraldo.pol" >/dev/null <<POLICY
+          <?xml version="1.0"?>
+          <!DOCTYPE Policy SYSTEM "https://www.debian.org/debsig/1.0/policy.dtd">
+          <Policy xmlns="https://www.debian.org/debsig/1.0/">
+            <Origin Name="heraldo" id="${keyid}" Description="heraldo package signing key"/>
+            <Selection>
+              <Required Type="origin" File="debsig.gpg" id="${keyid}"/>
+            </Selection>
+            <Verification MinOptional="0">
+              <Required Type="origin" File="debsig.gpg" id="${keyid}"/>
+            </Verification>
+          </Policy>
+          POLICY
+          for deb in dist/*.deb; do
+            if ! out="$(debsig-verify "${deb}" 2>&1)"; then
               printf '%s\n' "${out}"
               printf '%s' "${out}" | python3 -c 'import sys; print("::error title=Signature check failed::" + sys.stdin.read().replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
               exit 1
             fi
             printf '%s\n' "${out}"
-            cd - >/dev/null
           done
 
       - uses: actions/upload-artifact@v4
