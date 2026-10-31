@@ -1,0 +1,119 @@
+name: Release
+
+# Build heraldo's signed .deb with packaging/build.sh (Briefcase + debsigs) and
+# attach the .debs to a GitHub Release when a version tag (v*) is pushed. The
+# tag must match [project].version in pyproject.toml.
+# Pull requests and manual runs build and upload artifacts only (no release).
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (linux ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # x86_64 only for now (#2). Add `- runner: ubuntu-24.04-arm` /
+          # `arch: aarch64` here for 64-bit Raspberry Pi OS builds.
+          - runner: ubuntu-24.04
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tag matches pyproject.toml version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version="$(sed -n 's/^version *= *"\(.*\)"/\1/p' pyproject.toml | head -1)"
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} doesn't match pyproject.toml version ${version}"
+            exit 1
+          fi
+
+      # ubuntu-24.04's python3 is 3.12 (Briefcase 0.4.7+ needs 3.11+).
+      # Briefcase compiles dbus-python/PyGObject/pycairo into the package and
+      # checks that the runtime packages (bluez, ...) are installed.
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bluez gir1.2-glib-2.0 libcairo2 libdbus-1-3 libgirepository-1.0-1 \
+            libcairo2-dev libdbus-1-dev libgirepository1.0-dev libglib2.0-dev \
+            pkg-config python3-dev python3-venv dpkg-dev debsigs
+
+      - name: Install Briefcase
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install "briefcase>=0.4.7"
+
+      # build.sh needs a GPG secret key to sign the .deb: add the private key
+      # (no passphrase) as the HERALDO_GPG_PRIVATE_KEY repo secret, and
+      # optionally its fingerprint as HERALDO_GPG_KEY. Releases (tags) require
+      # the secret; pull requests and manual runs without it sign with a
+      # throwaway key so the build and signing still get tested.
+      - name: Import signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.HERALDO_GPG_PRIVATE_KEY }}
+        run: |
+          if [ -n "${GPG_PRIVATE_KEY}" ]; then
+            printf '%s\n' "${GPG_PRIVATE_KEY}" | gpg --batch --import
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "::error::the HERALDO_GPG_PRIVATE_KEY secret isn't set; a GPG key is needed to sign release packages"
+            exit 1
+          else
+            echo "::warning::HERALDO_GPG_PRIVATE_KEY isn't set; signing with a throwaway test key"
+            gpg --batch --passphrase '' --quick-gen-key "heraldo CI test key <ci@invalid>" ed25519 sign 1d
+          fi
+
+      - name: Build .deb
+        env:
+          BRIEFCASE: .venv/bin/briefcase
+          HERALDO_GPG_KEY: ${{ secrets.HERALDO_GPG_KEY }}
+        run: packaging/build.sh
+
+      # debsigs embeds the signature as the _gpgorigin member; it signs
+      # debian-binary + control.tar.* + data.tar.*, in that order.
+      - name: Verify package signature
+        run: |
+          for deb in "$PWD"/dist/*.deb; do
+            dir="$(mktemp -d)"
+            (cd "${dir}" && ar x "${deb}" && ar t "${deb}" \
+              && cat debian-binary control.tar.* data.tar.* | gpg --batch --verify _gpgorigin -)
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heraldo-linux-${{ matrix.arch }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes
