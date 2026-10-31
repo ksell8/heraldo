@@ -88,7 +88,8 @@ jobs:
           log="$(ls -t logs/*.log 2>/dev/null | head -1 || true)"
           log="${log:-build-output.txt}"
           if [ -n "${log}" ]; then
-            tail -n 40 "${log}" | python3 -c 'import sys; print("::error title=Briefcase log::" + sys.stdin.read().replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
+            # Error lines (e.g. a failed compile) are more useful than the traceback.
+            { grep -iE 'error|not found|missing|required|failed' "${log}" | grep -v '^│' | tail -n 40 || tail -n 40 "${log}"; } | python3 -c 'import sys; print("::error title=Briefcase log::" + sys.stdin.read().replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
           fi
 
       - uses: actions/upload-artifact@v4
