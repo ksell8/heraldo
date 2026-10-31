@@ -8,35 +8,30 @@
 # system_requires in pyproject.toml, and gpg. Build on the distro and
 # architecture you want to install on (e.g. on the Pi for arm64/armhf).
 #
+# A GPG secret key is needed to sign the package; the build fails without one.
+#
 # Environment:
 #   BRIEFCASE        briefcase command (default: briefcase)
-#   HERALDO_GPG_KEY  key to sign with (default: the key Kurt's commits are
-#                    signed with). Set it empty to skip signing. If the key
-#                    isn't in the keyring the package is left unsigned.
+#   HERALDO_GPG_KEY  key to sign with (default: gpg's default secret key)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 BRIEFCASE="${BRIEFCASE:-briefcase}"
-GPG_KEY="${HERALDO_GPG_KEY-89B143E859D3984EC0F6FA6B25CCC638FFF4F016}"
+GPG_KEY="${HERALDO_GPG_KEY:-}"
 
-# Version: prefer the git tag (v1.2.3 -> 1.2.3), fall back to pyproject.toml.
-version="$(git describe --tags --match 'v[0-9]*' 2>/dev/null | sed 's/^v//; s/-\([0-9]*\)-g/+\1.g/')" || true
-if [ -z "${version}" ]; then
-  version="$(sed -n 's/^version *= *"\(.*\)"/\1/p' pyproject.toml | head -1)"
+# Check for the signing key before spending time on the build.
+if ! gpg --batch --list-secret-keys ${GPG_KEY:+"${GPG_KEY}"} 2>/dev/null | grep -q '^sec'; then
+  echo "error: no GPG secret key${GPG_KEY:+ ${GPG_KEY}} found; one is needed to sign the package" >&2
+  exit 1
 fi
 
+# The version comes from [project].version in pyproject.toml.
 rm -rf build dist
-${BRIEFCASE} package linux system --no-input -C "version=\"${version}\""
+${BRIEFCASE} package linux system --no-input
 
 for deb in dist/*.deb; do
-  if [ -z "${GPG_KEY}" ]; then
-    echo "HERALDO_GPG_KEY is empty: ${deb} left unsigned" >&2
-  elif gpg --batch --list-secret-keys "${GPG_KEY}" > /dev/null 2>&1; then
-    gpg --batch --yes --local-user "${GPG_KEY}" --armor --detach-sign "${deb}"
-    gpg --batch --verify "${deb}.asc" "${deb}"
-  else
-    echo "warning: GPG key ${GPG_KEY} not in keyring: ${deb} left unsigned" >&2
-  fi
+  gpg --batch --yes ${GPG_KEY:+--local-user "${GPG_KEY}"} --armor --detach-sign "${deb}"
+  gpg --batch --verify "${deb}.asc" "${deb}"
 done
 
 ls -1 dist/*

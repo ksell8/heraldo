@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "heraldo"
-version = "0.1.0"
+version = "1.0.0"
 description = "BLE advertising beacon library for Raspberry Pi using BlueZ/DBus"
 requires-python = ">=3.10"
 license = "MIT"
@@ -30,7 +30,7 @@ packages = ["heraldo"]
 
 # --- Briefcase packaging (packaging/build.sh) ------------------------------
 # `briefcase package linux system` builds a .deb. The version comes from
-# [project] unless build.sh overrides it from the latest git tag.
+# [project].version.
 [tool.briefcase]
 project_name = "heraldo"
 bundle = "io.github.ksell8"

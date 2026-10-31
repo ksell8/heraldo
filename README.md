@@ -56,7 +56,9 @@ Runs until Ctrl+C or SIGTERM, then unregisters cleanly from BlueZ.
 
 ## Packaging
 
-`packaging/build.sh` builds a Debian package with [BeeWare Briefcase](https://briefcase.readthedocs.io/) (`briefcase package linux system`). dbus-python and PyGObject are compiled into the package, so it only needs the distro's Python, BlueZ and the GLib/D-Bus libraries at runtime:
+`packaging/build.sh` builds a Debian package with [BeeWare Briefcase](https://briefcase.readthedocs.io/) (`briefcase package linux system`) and signs it with GPG.
+
+Briefcase installs dbus-python and PyGObject into the package itself, but it builds them from source, so the build machine needs their C headers. Briefcase checks for these packages (`system_requires` in `pyproject.toml`) but doesn't install them:
 
 ```bash
 sudo apt install bluez libcairo2-dev libdbus-1-dev libgirepository1.0-dev libglib2.0-dev pkg-config
@@ -64,12 +66,13 @@ pip install briefcase
 packaging/build.sh
 # dist/heraldo_<version>-1~<distro>-<codename>_<arch>.deb
 # dist/heraldo_<version>-1~<distro>-<codename>_<arch>.deb.asc
-sudo apt install ./dist/heraldo_*.deb
 ```
 
-The version comes from the latest `v*` git tag, falling back to `pyproject.toml`. Build on the distro and architecture you want to install on (e.g. on the Pi for `arm64`/`armhf`).
+Machines that install the `.deb` don't need any of that: `sudo apt install ./heraldo_*.deb` pulls in the runtime dependencies (`bluez` and the GLib/D-Bus libraries) itself.
 
-The `.deb` gets a detached GPG signature (`.deb.asc`) from key `89B143E859D3984EC0F6FA6B25CCC638FFF4F016` when that key is in your keyring; set `HERALDO_GPG_KEY` to sign with another key, or to an empty value to skip signing. Verify with:
+The version comes from `version` in `pyproject.toml`. Build on the distro and architecture you want to install on (e.g. on the Pi for `arm64`/`armhf`).
+
+A GPG secret key is needed to do the build: the `.deb` gets a detached signature (`.deb.asc`) made with your default key, or the one named in `HERALDO_GPG_KEY`. Verify with:
 
 ```bash
 gpg --verify heraldo_*.deb.asc heraldo_*.deb
