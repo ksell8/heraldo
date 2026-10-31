@@ -3,7 +3,7 @@
 ## 1.0.0
 
 - No functional changes.
-- Packaged as a Debian package built with Briefcase (`packaging/build.sh`), with a detached GPG signature.
+- Packaged as a Debian package built with Briefcase (`packaging/build.sh`), GPG-signed with debsigs.
 
 ## 0.1.0
 
