@@ -77,7 +77,25 @@ jobs:
         env:
           BRIEFCASE: .venv/bin/briefcase
           HERALDO_GPG_KEY: ${{ secrets.HERALDO_GPG_KEY }}
-        run: packaging/build.sh
+        run: packaging/build.sh 2>&1 | tee build-output.txt
+
+      # Show why Briefcase failed: its log (logs/) as an artifact, and the
+      # last lines as an annotation on the run.
+      - name: Briefcase log on failure
+        if: failure()
+        run: |
+          log="$(ls -t logs/*.log 2>/dev/null | head -1 || true)"
+          log="${log:-build-output.txt}"
+          if [ -n "${log}" ]; then
+            tail -n 40 "${log}" | python3 -c 'import sys; print("::error title=Briefcase log::" + sys.stdin.read().replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: briefcase-logs-${{ matrix.arch }}
+          path: logs/
+          if-no-files-found: ignore
 
       # debsigs embeds the signature as the _gpgorigin member; it signs
       # debian-binary + control.tar.* + data.tar.*, in that order.
