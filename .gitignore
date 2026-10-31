@@ -4,4 +4,4 @@
 .venv/
 build/
 dist/
-*.spec
+logs/

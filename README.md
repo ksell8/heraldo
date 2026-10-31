@@ -56,15 +56,21 @@ Runs until Ctrl+C or SIGTERM, then unregisters cleanly from BlueZ.
 
 ## Packaging
 
-`packaging/build.sh` builds a self-contained `heraldo` (PyInstaller bundles the Python runtime and the dbus/GLib bindings) and wraps it in a Debian package:
+`packaging/build.sh` builds a Debian package with [BeeWare Briefcase](https://briefcase.readthedocs.io/) (`briefcase package linux system`). dbus-python and PyGObject are compiled into the package, so it only needs the distro's Python, BlueZ and the GLib/D-Bus libraries at runtime:
 
 ```bash
-sudo apt install python3-dbus python3-gi python3-pip dpkg-dev
-pip install pyinstaller
+sudo apt install bluez libcairo2-dev libdbus-1-dev libgirepository1.0-dev libglib2.0-dev pkg-config
+pip install briefcase
 packaging/build.sh
-# dist/heraldo-<version>-linux-<arch>.tar.gz
-# dist/heraldo_<version>_<arch>.deb
+# dist/heraldo_<version>-1~<distro>-<codename>_<arch>.deb
+# dist/heraldo_<version>-1~<distro>-<codename>_<arch>.deb.asc
 sudo apt install ./dist/heraldo_*.deb
 ```
 
-The version comes from the latest `v*` git tag, falling back to `pyproject.toml`. The `.deb` only depends on `bluez`; build it on the architecture you want to install on (e.g. on the Pi for `arm64`/`armhf`).
+The version comes from the latest `v*` git tag, falling back to `pyproject.toml`. Build on the distro and architecture you want to install on (e.g. on the Pi for `arm64`/`armhf`).
+
+The `.deb` gets a detached GPG signature (`.deb.asc`) from key `89B143E859D3984EC0F6FA6B25CCC638FFF4F016` when that key is in your keyring; set `HERALDO_GPG_KEY` to sign with another key, or to an empty value to skip signing. Verify with:
+
+```bash
+gpg --verify heraldo_*.deb.asc heraldo_*.deb
+```
