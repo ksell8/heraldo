@@ -75,7 +75,7 @@ A GPG secret key is needed to do the build: Briefcase signs the `.deb` with `deb
 
 ## Releases
 
-Pushing a version tag builds the signed `.deb` (x86_64 for now) with `packaging/build.sh` and attaches it and `SHA256SUMS` to a GitHub Release. The tag must match `version` in `pyproject.toml`, and the workflow needs the signing key in the `HERALDO_GPG_PRIVATE_KEY` repo secret (optionally its fingerprint in `HERALDO_GPG_KEY`). Pull requests and manual runs without the secret sign with a throwaway key, so only tagged releases need it.
+Pushing a version tag builds the signed `.deb` for x86_64 and aarch64 (arm64) with `packaging/build.sh` and attaches it and `SHA256SUMS` to a GitHub Release. The tag must match `version` in `pyproject.toml`, and the workflow needs the signing key in the `HERALDO_GPG_PRIVATE_KEY` repo secret (optionally its fingerprint in `HERALDO_GPG_KEY`). Pull requests and manual runs without the secret sign with a throwaway key, so only tagged releases need it.
 
 ```bash
 git tag v1.0.0

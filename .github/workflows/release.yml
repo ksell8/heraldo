@@ -21,10 +21,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # x86_64 only for now (#2). Add `- runner: ubuntu-24.04-arm` /
-          # `arch: aarch64` here for 64-bit Raspberry Pi OS builds.
           - runner: ubuntu-24.04
             arch: x86_64
+          # 64-bit Raspberry Pi OS (arm64). Native build on an Arm runner;
+          # 32-bit armhf would need QEMU or a self-hosted Pi.
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
