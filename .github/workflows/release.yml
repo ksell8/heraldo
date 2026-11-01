@@ -21,28 +21,35 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-24.04
-            arch: x86_64
           # 64-bit Raspberry Pi OS (arm64). Native build on an Arm runner;
-          # 32-bit armhf would need QEMU or a self-hosted Pi.
+          # 32-bit armhf would need QEMU or a self-hosted Pi. Raspberry Pi OS
+          # is built on Debian, trixie has (python3 3.13), not Ubuntu 24 (python3 3.12), and
+          # Briefcase's "linux system" target hard-fails unless the
+          # interpreter running Briefcase IS the machine's system python3
+          # (verify_system_python(), no override) -- so a deadsnakes
+          # python3.13 alongside noble's own python3 doesn't work, it has
+          # to actually be the system python3. Building inside a debian:trixie
+          # container (native on this arm64 runner, no QEMU) makes that true,
+          # and gets Briefcase's auto `libpython<ver>` dependency right too.
           - runner: ubuntu-24.04-arm
             arch: aarch64
+            container: "debian:trixie"
     runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
     steps:
+      # debian:trixie's container image is minimal: no sudo (we're root
+      # already, but the steps below assume a sudo-prefixed non-root user)
+      # and no git (actions/checkout needs it). No-op outside a container.
+      - name: Bootstrap container image
+        if: matrix.container != ''
+        run: apt-get update && apt-get install -y sudo git ca-certificates
+
       - uses: actions/checkout@v4
 
-      - name: Check tag matches pyproject.toml version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          version="$(sed -n 's/^version *= *"\(.*\)"/\1/p' pyproject.toml | head -1)"
-          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
-            echo "::error::tag ${GITHUB_REF_NAME} doesn't match pyproject.toml version ${version}"
-            exit 1
-          fi
-
-      # ubuntu-24.04's python3 is 3.12 (Briefcase 0.4.7+ needs 3.11+).
-      # Briefcase compiles dbus-python/PyGObject/pycairo into the package and
-      # checks that the runtime packages (bluez, ...) are installed.
+      # ubuntu-24.04's python3 is 3.12, debian:trixie's is 3.13 (Briefcase
+      # 0.4.7+ needs 3.11+). Briefcase compiles dbus-python/PyGObject/pycairo
+      # into the package and checks that the runtime packages (bluez, ...)
+      # are installed.
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -74,6 +81,15 @@ jobs:
             echo "::warning::HERALDO_GPG_PRIVATE_KEY isn't set; signing with a throwaway test key"
             gpg --batch --passphrase '' --quick-gen-key "heraldo CI test key <ci@invalid>" ed25519 sign 1d
           fi
+
+          # debsigs (built on the old PGP::Sign Perl module) signs with the
+          # SHA1 digest unless told otherwise, and GnuPG on noble refuses to
+          # even check SHA1 signatures ("Can't check signature: Invalid
+          # digest algorithm"), so debsig-verify fails on an otherwise
+          # correctly signed package. Force SHA256 for signing here and for
+          # the verify step's checks later.
+          mkdir -p ~/.gnupg
+          printf 'digest-algo SHA256\ncert-digest-algo SHA256\n' >> ~/.gnupg/gpg.conf
 
       - name: Build .deb
         env:
@@ -126,7 +142,15 @@ jobs:
           </Policy>
           POLICY
           for deb in dist/*.deb; do
-            if ! out="$(debsig-verify "${deb}" 2>&1)"; then
+            # Diagnostics for a "Failed verification" with no other detail:
+            # confirm control.tar/data.tar got the .xz compression build.sh
+            # requests (not dpkg-deb's zstd default, which debsigs 0.1.26
+            # can't read and may sign incompletely), and ask debsig-verify
+            # why the signature didn't check out.
+            echo "::group::ar members of ${deb}"
+            ar tv "${deb}"
+            echo "::endgroup::"
+            if ! out="$(debsig-verify -d "${deb}" 2>&1)"; then
               printf '%s\n' "${out}"
               printf '%s' "${out}" | python3 -c 'import sys; print("::error title=Signature check failed::" + sys.stdin.read().replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
               exit 1
@@ -136,7 +160,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: heraldo-linux-${{ matrix.arch }}
+          name: heraldo-linux-${{ matrix.arch }}-{{ matrix.container }}
           path: dist/*.deb
           if-no-files-found: error
 
