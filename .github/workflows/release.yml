@@ -126,7 +126,15 @@ jobs:
           </Policy>
           POLICY
           for deb in dist/*.deb; do
-            if ! out="$(debsig-verify "${deb}" 2>&1)"; then
+            # Diagnostics for a "Failed verification" with no other detail:
+            # confirm control.tar/data.tar got the .xz compression build.sh
+            # requests (not dpkg-deb's zstd default, which debsigs 0.1.26
+            # can't read and may sign incompletely), and ask debsig-verify
+            # why the signature didn't check out.
+            echo "::group::ar members of ${deb}"
+            ar tv "${deb}"
+            echo "::endgroup::"
+            if ! out="$(debsig-verify -d "${deb}" 2>&1)"; then
               printf '%s\n' "${out}"
               printf '%s' "${out}" | python3 -c 'import sys; print("::error title=Signature check failed::" + sys.stdin.read().replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
               exit 1
