@@ -24,12 +24,27 @@ jobs:
           - runner: ubuntu-24.04
             arch: x86_64
           # 64-bit Raspberry Pi OS (arm64). Native build on an Arm runner;
-          # 32-bit armhf would need QEMU or a self-hosted Pi.
+          # 32-bit armhf would need QEMU or a self-hosted Pi. Raspberry Pi OS
+          # is Debian trixie, which ships Python 3.13 by default; Briefcase
+          # hardcodes a `libpython<ver>` runtime dependency based on whatever
+          # Python built the package, so build with 3.13 here (via
+          # deadsnakes, since ubuntu-24.04-arm's own python3 is 3.12) or the
+          # resulting .deb depends on a libpython3.12 the Pi doesn't have.
           - runner: ubuntu-24.04-arm
             arch: aarch64
+            python: "3.13"
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Python ${{ matrix.python }} (deadsnakes)
+        if: matrix.python != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository -y ppa:deadsnakes/ppa
+          sudo apt-get update
+          sudo apt-get install -y "python${{ matrix.python }}" "python${{ matrix.python }}-venv" "python${{ matrix.python }}-dev"
 
       # ubuntu-24.04's python3 is 3.12 (Briefcase 0.4.7+ needs 3.11+).
       # Briefcase compiles dbus-python/PyGObject/pycairo into the package and
@@ -43,8 +58,10 @@ jobs:
             pkg-config python3-dev python3-venv dpkg-dev debsigs debsig-verify
 
       - name: Install Briefcase
+        env:
+          PYTHON: ${{ matrix.python && format('python{0}', matrix.python) || 'python3' }}
         run: |
-          python3 -m venv .venv
+          "${PYTHON}" -m venv .venv
           .venv/bin/pip install "briefcase>=0.4.7"
 
       # build.sh needs a GPG secret key to sign the .deb: add the private key
