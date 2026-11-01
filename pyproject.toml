@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "heraldo"
-version = "v0.0.0.fix"
+version = "0.0.0"
 description = "BLE advertising beacon library for Raspberry Pi using BlueZ/DBus"
 requires-python = ">=3.10"
 license = "MIT"
