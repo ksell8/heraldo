@@ -66,6 +66,15 @@ jobs:
             gpg --batch --passphrase '' --quick-gen-key "heraldo CI test key <ci@invalid>" ed25519 sign 1d
           fi
 
+          # debsigs (built on the old PGP::Sign Perl module) signs with the
+          # SHA1 digest unless told otherwise, and GnuPG on noble refuses to
+          # even check SHA1 signatures ("Can't check signature: Invalid
+          # digest algorithm"), so debsig-verify fails on an otherwise
+          # correctly signed package. Force SHA256 for signing here and for
+          # the verify step's checks later.
+          mkdir -p ~/.gnupg
+          printf 'digest-algo SHA256\ncert-digest-algo SHA256\n' >> ~/.gnupg/gpg.conf
+
       - name: Build .deb
         env:
           BRIEFCASE: .venv/bin/briefcase
