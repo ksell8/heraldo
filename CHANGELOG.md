@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.1
 
 - New `ble-beacon` package (`packaging/build-beacon.sh`): runs heraldo as the `ble-beacon` systemd service, configured in `/etc/default/ble-beacon`. Moved here from La Semilla's Ansible `bluetooth` role.
 
