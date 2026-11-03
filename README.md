@@ -73,9 +73,27 @@ The version comes from `version` in `pyproject.toml`. Build on the distro and ar
 
 A GPG secret key is needed to do the build: Briefcase signs the `.deb` with `debsigs` (the signature is embedded in the package) using the first secret key in your keyring, or the one named in `HERALDO_GPG_KEY`. `apt`/`dpkg` don't check this signature by default; check it with `debsig-verify` and a policy for the key.
 
+## ble-beacon service
+
+`packaging/build-beacon.sh` builds a second, architecture-independent package, `ble-beacon`, that depends on `heraldo` and runs it as the `ble-beacon` systemd service (enabled and started on install, restarted on upgrade). It needs `dpkg-deb`, `debsigs` and a GPG secret key, like `build.sh`:
+
+```bash
+packaging/build-beacon.sh
+# dist/ble-beacon_<version>-1_all.deb
+sudo apt install ./heraldo_*.deb ./ble-beacon_*.deb
+```
+
+The beacon is set by `HERALDO_ARGS` (heraldo's command line) in `/etc/default/ble-beacon`, a conffile that upgrades keep:
+
+```bash
+HERALDO_ARGS="eddystone-uid --ad-type broadcast --namespace 6469737475724274a865 --instance 737461747573 --tx-power -59"
+```
+
+Restart the service after editing it: `sudo systemctl restart ble-beacon`.
+
 ## Releases
 
-Pushing a version tag builds the signed `.deb` for x86_64 and aarch64 (arm64) with `packaging/build.sh` and attaches it and `SHA256SUMS` to a GitHub Release. The tag must match `version` in `pyproject.toml`, and the workflow needs the signing key in the `HERALDO_GPG_PRIVATE_KEY` repo secret (optionally its fingerprint in `HERALDO_GPG_KEY`). Pull requests and manual runs without the secret sign with a throwaway key, so only tagged releases need it.
+Pushing a version tag builds the signed heraldo `.deb` with `packaging/build.sh` and the `ble-beacon` `.deb` with `packaging/build-beacon.sh` and attaches them and `SHA256SUMS` to a GitHub Release. The tag must match `version` in `pyproject.toml`, and the workflow needs the signing key in the `HERALDO_GPG_PRIVATE_KEY` repo secret (optionally its fingerprint in `HERALDO_GPG_KEY`). Pull requests and manual runs without the secret sign with a throwaway key, so only tagged releases need it.
 
 ```bash
 git tag v1.0.0

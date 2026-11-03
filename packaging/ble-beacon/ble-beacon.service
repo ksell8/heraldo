@@ -1,0 +1,17 @@
+[Unit]
+Description=heraldo BLE beacon
+Documentation=https://github.com/ksell8/heraldo
+After=bluetooth.service
+Requires=bluetooth.service
+
+[Service]
+Type=simple
+Environment=DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
+# HERALDO_ARGS (the heraldo command line) is set in /etc/default/ble-beacon.
+EnvironmentFile=/etc/default/ble-beacon
+ExecStart=/usr/bin/heraldo $HERALDO_ARGS
+Restart=on-failure
+User=root
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,7 @@
+# Arguments passed to heraldo by the ble-beacon service.
+# Run `heraldo --help` (or `heraldo <beacon-type> --help`) for the options.
+# After editing: sudo systemctl restart ble-beacon
+#
+# Example iBeacon:
+#   HERALDO_ARGS="ibeacon --uuid 550e8400-e29b-41d4-a716-446655440000 --major 1 --minor 1"
+HERALDO_ARGS="eddystone-uid --ad-type broadcast --namespace 6469737475724274a865 --instance 737461747573 --tx-power -59"

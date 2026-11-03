@@ -98,6 +98,13 @@ jobs:
         shell: bash
         run: packaging/build.sh 2>&1 | tee build-output.txt
 
+      # The ble-beacon service package (Architecture: all, depends on heraldo).
+      - name: Build ble-beacon .deb
+        env:
+          HERALDO_GPG_KEY: ${{ secrets.HERALDO_GPG_KEY }}
+        shell: bash
+        run: packaging/build-beacon.sh
+
       # Show why Briefcase failed: its log (logs/) as an artifact, and the
       # last lines as an annotation on the run.
       - name: Briefcase log on failure
